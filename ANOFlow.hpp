@@ -268,13 +268,13 @@ class ANOFlow : public LibXR::Application {
 
       while (time_ms > 0) {
         LibXR::STDIO::Printf<
-            "ANOFlow: link=%d work=%d quality=%u vel=(%d,%d) alt=%lu\r\n">(
+            "ANOFlow: link=%d work=%d quality=%u vel=(%d,%d) alt=%u\r\n">(
             static_cast<int>(ano_flow->data_.link_alive),
             static_cast<int>(ano_flow->data_.work_alive),
             static_cast<unsigned>(ano_flow->data_.quality),
             static_cast<int>(ano_flow->data_.vel_x_cmps),
             static_cast<int>(ano_flow->data_.vel_y_cmps),
-            static_cast<unsigned long>(ano_flow->data_.alt_cm));
+            static_cast<unsigned>(ano_flow->data_.alt_cm));
         LibXR::Thread::Sleep(interval_ms);
         time_ms -= interval_ms;
       }
