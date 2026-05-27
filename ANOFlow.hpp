@@ -10,12 +10,10 @@ template_args: []
 required_hardware:
   - ano_flow_uart
   - ramfs
-depends:
-  - AnotcCommon
+depends: []
 === END MANIFEST === */
 // clang-format on
 
-#include "AnotcCommon.hpp"
 #include "app_framework.hpp"
 #include "message.hpp"
 #include "ramfs.hpp"
@@ -30,6 +28,31 @@ depends:
 
 class ANOFlow : public LibXR::Application {
  public:
+  struct Data {
+    bool link_alive = false;
+    bool flow_valid = false;
+    bool alt_valid = false;
+    bool work_alive = false;
+    uint8_t quality = 0;
+    uint8_t of0_sta = 0;
+    uint8_t of1_sta = 0;
+    uint8_t of2_sta = 0;
+    int16_t raw_dx = 0;
+    int16_t raw_dy = 0;
+    int16_t vel_x_cmps = 0;
+    int16_t vel_y_cmps = 0;
+    int16_t vel_x_fix_cmps = 0;
+    int16_t vel_y_fix_cmps = 0;
+    int16_t integral_x = 0;
+    int16_t integral_y = 0;
+    uint32_t alt_cm = 0;
+    std::array<int16_t, 3> acc = {};
+    std::array<int16_t, 3> gyr = {};
+    std::array<float, 4> quaternion = {1.0f, 0.0f, 0.0f, 0.0f};
+    uint32_t flow_update_count = 0;
+    uint32_t alt_update_count = 0;
+  };
+
   ANOFlow(LibXR::HardwareContainer& hw, LibXR::ApplicationManager& app,
           const char* data_topic_name, size_t task_stack_depth)
       : topic_(data_topic_name, sizeof(data_), nullptr, true, true, true),
@@ -45,6 +68,10 @@ class ANOFlow : public LibXR::Application {
   void OnMonitor() override {}
 
  private:
+  static constexpr uint8_t ANO_FRAME_HEAD_DEF = 0xAA;
+  static constexpr uint8_t ANO_HW_TYPE_DEF = 0x05;
+  static constexpr uint8_t ANO_HW_ALL_DEF = 0xFF;
+
   static int16_t ReadS16LE(const uint8_t* data) {
     return static_cast<int16_t>((static_cast<uint16_t>(data[1]) << 8) | data[0]);
   }
@@ -158,13 +185,13 @@ class ANOFlow : public LibXR::Application {
   void ParseByte(const uint8_t data) {
     switch (rx_state_) {
       case 0:
-        if (data == 0xAA) {
+        if (data == ANO_FRAME_HEAD_DEF) {
           rx_state_ = 1;
           frame_buffer_[0] = data;
         }
         break;
       case 1:
-        if (data == Anotc::kAnoHwType || data == Anotc::kAnoHwAll) {
+        if (data == ANO_HW_TYPE_DEF || data == ANO_HW_ALL_DEF) {
           rx_state_ = 2;
           frame_buffer_[1] = data;
         } else {
@@ -228,9 +255,9 @@ class ANOFlow : public LibXR::Application {
 
   static int CommandFunc(ANOFlow* ano_flow, int argc, char** argv) {
     if (argc == 1) {
-      LibXR::STDIO::Printf("Usage:\r\n");
-      LibXR::STDIO::Printf(
-          "  show [time_ms] [interval_ms] - Print optical flow state.\r\n");
+      LibXR::STDIO::Printf<"Usage:\r\n">();
+      LibXR::STDIO::Printf<
+          "  show [time_ms] [interval_ms] - Print optical flow state.\r\n">();
       return 0;
     }
 
@@ -240,8 +267,8 @@ class ANOFlow : public LibXR::Application {
       interval_ms = std::clamp(interval_ms, 10, 1000);
 
       while (time_ms > 0) {
-        LibXR::STDIO::Printf(
-            "ANOFlow: link=%d work=%d quality=%u vel=(%d,%d) alt=%lu\r\n",
+        LibXR::STDIO::Printf<
+            "ANOFlow: link=%d work=%d quality=%u vel=(%d,%d) alt=%lu\r\n">(
             static_cast<int>(ano_flow->data_.link_alive),
             static_cast<int>(ano_flow->data_.work_alive),
             static_cast<unsigned>(ano_flow->data_.quality),
@@ -254,7 +281,7 @@ class ANOFlow : public LibXR::Application {
       return 0;
     }
 
-    LibXR::STDIO::Printf("Error: Invalid arguments.\r\n");
+    LibXR::STDIO::Printf<"Error: Invalid arguments.\r\n">();
     return -1;
   }
 
@@ -265,7 +292,7 @@ class ANOFlow : public LibXR::Application {
   uint32_t last_flow_update_ms_ = 0;
   uint32_t last_alt_update_ms_ = 0;
   std::array<uint8_t, 64> frame_buffer_ = {};
-  Anotc::OpticalFlowData data_;
+  Data data_;
   LibXR::Topic topic_;
   LibXR::UART* uart_;
   LibXR::RamFS::File cmd_file_;
